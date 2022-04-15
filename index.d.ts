@@ -1,4 +1,4 @@
-declare module 'react-native-touch-id' {
+declare module 'react-native-touch-id-passcode' {
     /**
      * The supported biometry type
      */

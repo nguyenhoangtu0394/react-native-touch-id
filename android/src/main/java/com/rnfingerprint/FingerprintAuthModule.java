@@ -98,6 +98,10 @@ public class FingerprintAuthModule extends ReactContextBaseJavaModule implements
         final FingerprintManager.CryptoObject cryptoObject = new FingerprintManager.CryptoObject(cipher);
 
         final DialogResultHandler drh = new DialogResultHandler(reactErrorCallback, reactSuccessCallback);
+        // set fallback error
+        if (authConfig != null && authConfig.hasKey("fallbackLabel")) {
+            drh.setFallbackError(authConfig.getString("fallbackLabel"));
+        }
 
         final FingerprintDialog fingerprintDialog = new FingerprintDialog();
         fingerprintDialog.setCryptoObject(cryptoObject);

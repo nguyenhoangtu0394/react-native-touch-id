@@ -62,6 +62,6 @@ public class FingerprintHandler extends FingerprintManager.AuthenticationCallbac
 
         void onError(String errorString, int errorCode);
 
-        void onCancelled();
+        void onCancelled(Boolean isFallback);
     }
 }

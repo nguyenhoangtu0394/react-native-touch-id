@@ -21,16 +21,19 @@ public class FingerprintDialog extends DialogFragment implements FingerprintHand
     private DialogResultListener dialogCallback;
     private FingerprintHandler mFingerprintHandler;
     private boolean isAuthInProgress;
+    private int countAuthFail = 0;
 
     private ImageView mFingerprintImage;
     private TextView mFingerprintSensorDescription;
     private TextView mFingerprintError;
+    private Button mFallbackButton;
 
     private String authReason;
     private int imageColor = 0;
     private int imageErrorColor = 0;
     private String dialogTitle = "";
     private String cancelText = "";
+    private String fallbackText = null;
     private String sensorDescription = "";
     private String sensorErrorDescription = "";
     private String errorText = "";
@@ -72,7 +75,16 @@ public class FingerprintDialog extends DialogFragment implements FingerprintHand
         mCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                onCancelled();
+                onCancelled(false);
+            }
+        });
+
+        mFallbackButton = (Button) v.findViewById(R.id.fallback_button);
+        mFallbackButton.setText(this.fallbackText);
+        mFallbackButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                onCancelled(true);
             }
         });
 
@@ -83,7 +95,7 @@ public class FingerprintDialog extends DialogFragment implements FingerprintHand
                     return false; // pass on to be processed as normal
                 }
 
-                onCancelled();
+                onCancelled(false);
                 return true; // pretend we've processed it
             }
         });
@@ -153,6 +165,10 @@ public class FingerprintDialog extends DialogFragment implements FingerprintHand
         if (config.hasKey("imageErrorColor")) {
             this.imageErrorColor = config.getInt("imageErrorColor");
         }
+
+        if (config.hasKey("fallbackLabel")) {
+            this.fallbackText = config.getString("fallbackLabel");
+        }
     }
 
     public interface DialogResultListener {
@@ -160,7 +176,7 @@ public class FingerprintDialog extends DialogFragment implements FingerprintHand
 
         void onError(String errorString, int errorCode);
 
-        void onCancelled();
+        void onCancelled(Boolean isFallback);
     }
 
     @Override
@@ -172,16 +188,20 @@ public class FingerprintDialog extends DialogFragment implements FingerprintHand
 
     @Override
     public void onError(String errorString, int errorCode) {
+        this.countAuthFail += 1;
+        if (this.fallbackText != null && countAuthFail >= 2) {
+            mFallbackButton.setVisibility(View.VISIBLE);
+        }
         this.mFingerprintError.setText(errorString);
         this.mFingerprintImage.setColorFilter(this.imageErrorColor);
         this.mFingerprintSensorDescription.setText(this.sensorErrorDescription);
     }
 
     @Override
-    public void onCancelled() {
+    public void onCancelled(Boolean isFallback) {
         this.isAuthInProgress = false;
         this.mFingerprintHandler.endAuth();
-        this.dialogCallback.onCancelled();
+        this.dialogCallback.onCancelled(isFallback);
         dismiss();
     }
 }
