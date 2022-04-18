@@ -5,15 +5,10 @@ import com.facebook.react.bridge.Callback;
 public class DialogResultHandler implements FingerprintDialog.DialogResultListener {
     private Callback errorCallback;
     private Callback successCallback;
-    private String fallbackError = null;
 
     public DialogResultHandler(Callback reactErrorCallback, Callback reactSuccessCallback) {
       errorCallback = reactErrorCallback;
       successCallback = reactSuccessCallback;
-    }
-
-    public void setFallbackError(String fallbackError) {
-      this.fallbackError = fallbackError;
     }
 
     @Override
@@ -30,8 +25,8 @@ public class DialogResultHandler implements FingerprintDialog.DialogResultListen
     @Override
     public void onCancelled(Boolean isFallback) {
       FingerprintAuthModule.inProgress = false;
-      if(isFallback && fallbackError != null) {
-        errorCallback.invoke(this.fallbackError, FingerprintAuthConstants.AUTHENTICATION_CANCELED);
+      if (isFallback) {
+        errorCallback.invoke("fallback", FingerprintAuthConstants.AUTHENTICATION_CANCELED);
       } else {
         errorCallback.invoke("cancelled", FingerprintAuthConstants.AUTHENTICATION_CANCELED);
       }
