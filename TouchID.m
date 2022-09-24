@@ -52,54 +52,48 @@ RCT_EXPORT_METHOD(authenticate: (NSString *)reason
                   options:(NSDictionary *)options
                   callback: (RCTResponseSenderBlock)callback)
 {
-//    NSNumber *passcodeFallback = [NSNumber numberWithBool:false];
-    Boolean passcodeFallback = false;
-    LAContext *context = [[LAContext alloc] init];
-    NSError *error;
+    NSString *keyBiometric = @"react-native-touch-id-biometric";
+    CFErrorRef error = NULL;
+    SecAccessControlRef access = SecAccessControlCreateWithFlags(
+                                                                 nil,
+                                                                 kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+                                                                 kSecAccessControlUserPresence,
+                                                                 &error);
 
-    if (RCTNilIfNull([options objectForKey:@"fallbackLabel"]) != nil) {
-        NSString *fallbackLabel = [RCTConvert NSString:options[@"fallbackLabel"]];
-        context.localizedFallbackTitle = fallbackLabel;
+    if (access == NULL || error != NULL) {
+      callback(@[RCTMakeError(@"RCTTouchIDNotSupported", nil, nil)]);
+      return;
     }
+    
+    LAContext* context = [[LAContext alloc] init];
+    NSDictionary *query = @{
+      (id)kSecClass: (id)kSecClassGenericPassword,
+      (id)kSecAttrAccount: keyBiometric,
+      (id)kSecAttrAccessControl: (__bridge_transfer id)access,
+      (id)kSecUseAuthenticationContext: context,
+      (id)kSecValueData: [@"true" dataUsingEncoding:NSUTF8StringEncoding]
+    };
 
-    if (RCTNilIfNull([options objectForKey:@"passcodeFallback"]) != nil) {
-//        passcodeFallback = [RCTConvert NSNumber:options[@"passcodeFallback"]];
-        passcodeFallback = [[RCTConvert NSNumber:options[@"passcodeFallback"]] boolValue];
-    }
-
-    // Device has TouchID
-//    if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
-    if (!passcodeFallback && [context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
-        // Attempt Authentification
-        [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
-                localizedReason:reason
-                          reply:^(BOOL success, NSError *error)
-         {
-             [self handleAttemptToUseDeviceIDWithSuccess:success error:error callback:callback];
-         }];
-
-        // Device does not support TouchID but user wishes to use passcode fallback
-//    else if ([passcodeFallback boolValue] && [context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:&error]) {
-    } else if (passcodeFallback && [context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
-        // Attempt Authentification
-        [context evaluatePolicy:LAPolicyDeviceOwnerAuthentication
-                localizedReason:reason
-                          reply:^(BOOL success, NSError *error)
-         {
-             [self handleAttemptToUseDeviceIDWithSuccess:success error:error callback:callback];
-         }];
-    }
-    else {
-        if (error) {
-            NSString *errorReason = [self getErrorReason:error];
-            NSLog(@"Authentication failed: %@", errorReason);
-            
-            callback(@[RCTMakeError(errorReason, nil, nil), [self getBiometryType:context]]);
-            return;
+    // Deletes the existing item prior to inserting the new one
+    SecItemDelete((CFDictionaryRef)query);
+    
+    OSStatus insertStatus = SecItemAdd((CFDictionaryRef)query, nil);
+    if (insertStatus == errSecSuccess) {
+        NSDictionary* getQuery = @{
+        (id)kSecClass: (id)kSecClassGenericPassword,
+        (id)kSecAttrAccount: keyBiometric,
+        (id)kSecMatchLimit: (id)kSecMatchLimitOne,
+        (id)kSecUseAuthenticationContext: context,
+        (id)kSecReturnData: (id)kCFBooleanTrue
+        };
+        OSStatus getStatus = SecItemCopyMatching((CFDictionaryRef)getQuery, nil);
+        if (getStatus == errSecSuccess) {
+            callback(@[[NSNull null], @"Authenticated with Touch ID."]);
+        } else {
+            callback(@[RCTMakeError(@"LAErrorAuthenticationFailed", nil, nil)]);
         }
-        
-        callback(@[RCTMakeError(@"RCTTouchIDNotSupported", nil, nil)]);
-        return;
+    } else {
+        callback(@[RCTMakeError(@"LAErrorSystemCancel", nil, nil)]);
     }
 }
 
