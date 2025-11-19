@@ -11,32 +11,15 @@ RCT_EXPORT_MODULE();
 RCT_EXPORT_METHOD(isSupported: (NSDictionary *)options
                   callback: (RCTResponseSenderBlock)callback)
 {
-    LAContext *context = [[LAContext alloc] init];
-    NSError *error;
-    
-    // Check to see if we have a passcode fallback
-    // NSNumber *passcodeFallback = [NSNumber numberWithBool:true];
-    Boolean passcodeFallback = false;
-    if (RCTNilIfNull([options objectForKey:@"passcodeFallback"]) != nil) {
-        // passcodeFallback = [RCTConvert NSNumber:options[@"passcodeFallback"]];
-        passcodeFallback = [[RCTConvert NSNumber:options[@"passcodeFallback"]] boolValue];
-    }
-    
-    if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
-        
-        // No error found, proceed
+    NSError *aerr = nil;
+    LAContext *context = [LAContext new];
+    BOOL canBeProtected = [context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&aerr];
+
+    if (!aerr && canBeProtected) {
         callback(@[[NSNull null], [self getBiometryType:context]]);
-    }
-//    else if ([passcodeFallback boolValue] && [context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:&error]) {
-    else if (passcodeFallback && [context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:&error]) {
-   
-        // No error
-        callback(@[[NSNull null], [self getBiometryType:context]]);
-    }
-    // Device does not support FaceID / TouchID / Pin OR there was an error!
-    else {
-        if (error) {
-            NSString *errorReason = [self getErrorReason:error];
+    } else {
+        if (aerr) {
+            NSString *errorReason = [self getErrorReason:aerr];
             NSLog(@"Authentication failed: %@", errorReason);
             
             callback(@[RCTMakeError(errorReason, nil, nil), [self getBiometryType:context]]);
@@ -160,15 +143,12 @@ RCT_EXPORT_METHOD(authenticate: (NSString *)reason
         if (context.biometryType == LABiometryTypeFaceID) {
             return @"FaceID";
         }
-        else if (context.biometryType == LABiometryTypeTouchID) {
-            return @"TouchID";
-        }
-        else if (context.biometryType == LABiometryNone) {
-            return @"None";
-        }
+    }
+    if (context.biometryType == LABiometryTypeTouchID) {
+        return @"TouchID";
     }
 
-    return @"TouchID";
+    return @"None";
 }
 
 @end
